@@ -16,7 +16,7 @@ from feedgen.feed import FeedGenerator
 from flask import Flask, send_from_directory
 from zotify_auth import ZotifyAuth
 
-DATA_DIR = "data"
+DATA_DIR = "/data"
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 
