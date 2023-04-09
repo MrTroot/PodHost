@@ -153,7 +153,7 @@ def download_episode(podcast_id, podcast_name, episode):
 
         if os.path.isfile(expected_file_path):
             #Move and rename file
-            new_file_dir = os.path.join(PODCAST_DIR, podcast_id)
+            new_file_dir = os.path.join(PODCASTS_DIR, podcast_id)
             if not os.path.exists(new_file_dir):
                 os.makedirs(new_file_dir)
             new_file_path = os.path.join(new_file_dir, episode_id + ".ogg")
