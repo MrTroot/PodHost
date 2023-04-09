@@ -26,9 +26,12 @@ jobs:
         username: ${{ github.repository_owner }}
         password: ${{ secrets.GHCR_TOKEN }}
 
+    - name: Set environment variable with lowercase username
+      run: echo "REPOSITORY_OWNER_LOWER=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
     - name: Build and push Docker image
       uses: docker/build-push-action@v2
       with:
         context: .
         push: true
-        tags: ghcr.io/${{ github.repository_owner | tolower }}/podhost:latest
+        tags: ghcr.io/${{ env.REPOSITORY_OWNER_LOWER }}/your-image-name:latest
