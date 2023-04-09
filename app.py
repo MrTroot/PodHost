@@ -51,7 +51,7 @@ def generate_rss_feed(podcast_webpath, podcast_localpath):
 
     # Loop through all the episode files in this subfolder and add them to the feed
     for filename in os.listdir(podcast_localpath):
-        if filename.endswith('.mp3'):
+        if filename.endswith('.mp3') or filename.endswith('.ogg'):
             fe = fg_podcast.add_entry()
             fe.id(appurl + podcast_webpath + '/' + filename)
             fe.title(re.search('(.+)\..+',filename).group(1))
