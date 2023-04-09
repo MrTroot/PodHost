@@ -5,11 +5,14 @@ import time
 import mimetypes
 import re
 import json
+import spotipy
+from urllib.parse import quote
+from spotipy.oauth2 import SpotifyClientCredentials
 from threading import Thread
 from feedgen.feed import FeedGenerator
 from flask import Flask, send_from_directory
 
-DATA_DIR = "/data"
+DATA_DIR = "data"
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 
@@ -55,7 +58,8 @@ def generate_rss_feed(podcast_webpath, podcast_localpath):
             fe = fg_podcast.add_entry()
             fe.id(appurl + podcast_webpath + '/' + filename)
             fe.title(re.search('(.+)\..+',filename).group(1))
-            fe.link(href=appurl + podcast_webpath + '/' + filename, rel='alternate')
+            download_url = quote((appurl + podcast_webpath + '/' + filename).replace(' ', '%20'), safe=':/?&=')
+            fe.link(href=download_url, rel='alternate')
             fe.description('Episode for ' + podcast_webpath)
 
     # Save the feed as an XML file in the subfolder
@@ -81,6 +85,9 @@ def load_config(config_file):
 
     with open(config_file, 'r') as f:
         config = json.load(f)
+        if config['spotify_client_id'] == "your_client_ID":
+            print("Default config file generated. Please update the config file and restart the container.")
+            sys.exit(0)
 
     return config
 
@@ -88,14 +95,12 @@ def load_config(config_file):
 def create_default_config(config_file):
     default_config = {
         "appurl": "http://127.0.0.1/",
+        "spotify_client_id": "your_client_ID",
+        "spotify_client_secret": "your_client_secret",
         "podcasts": [
             {
-                "name": "Podcast1",
-                "url": "https://spotify.com/example1"
-            },
-            {
-                "name": "Podcast2",
-                "url": "https://spotify.com/example2"
+                "name": "Heavyweight",
+                "id": "5c26B28vZMN8PG0Nppmn5G"
             }
         ]
     }
@@ -106,21 +111,56 @@ def update_podcasts():
     while True:
         print('Updating podcasts')
         for podcast in podcasts:
-            podcast_name = podcast['name']
-            podcast_url = podcast['url']
+            #Get podcast info from Spotify API
+            podcast_id = podcast['id']
+            podcast_info = sp.show(podcast_id, market='US')
+            podcast_episodes = podcast_info['episodes']['items']
+            podcast_name = podcast_info['name']
             print(f'Updating {podcast_name}')
-            try:
-                command = ["zotify", f"--credentials-location={CREDENTIAL_PATH}", f"--root-podcast-path={PODCAST_DIR}", f"--temp-download-dir={TEMP_DIR}", "--skip-existing=True", podcast_url]
-                subprocess.run(command, check=True)
-            except subprocess.CalledProcessError as e:
-                print(f"Error downloading files: {e}")
+            # Iterate through the episodes
+            for episode in podcast_episodes:
+                # Check if the episode has already been downloaded, download if not
+                episode_id = episode['id']
+                episode_name = episode['name']
+                expected_path = os.path.join(PODCAST_DIR, podcast_name)
+                expected_name = fix_filename(podcast_name) + ' - ' + fix_filename(episode_name)
+                if not file_exists_without_extension(expected_name, expected_path):
+                    #Download episode
+                    download_episode(podcast_name, episode)
+                
         time.sleep(3600)
-        
+
+def download_episode(podcast_name, episode):
+    try:
+        episode_url = episode['external_urls']['spotify']
+        episode_name = episode['name']
+        print("Downloading " + episode_url)
+        command = ["zotify", f"--credentials-location={CREDENTIAL_PATH}", f"--root-podcast-path={PODCAST_DIR}", f"--temp-download-dir={TEMP_DIR}", "--print-download-progress=False",episode_url]
+        subprocess.run(command, check=True)
+
+    except subprocess.CalledProcessError as e:
+        print(f"Error downloading files: {e}")
+
+
+def file_exists_without_extension(filename_without_extension, directory):
+    for file in os.listdir(directory):
+        if file.startswith(filename_without_extension):
+            return True
+    return False
+
+def fix_filename(name):
+    return re.sub(r'[/\\:|<>"?*\0-\x1f]|^(AUX|COM[1-9]|CON|LPT[1-9]|NUL|PRN)(?![^.])|^\s|[\s.]$', "_", str(name), flags=re.IGNORECASE)
+
 
 #Load config
 config = load_config(CONFIG_PATH)
 appurl = config['appurl']
 podcasts = config['podcasts']
+spotify_client_id = config['spotify_client_id']
+spotify_client_secret = config['spotify_client_secret']
+
+#Initiate Spotipy
+sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id=spotify_client_id, client_secret=spotify_client_secret))
 
 # Start the folder scanning thread
 t = Thread(target=scan_folders)
