@@ -6,15 +6,17 @@ import mimetypes
 import re
 import json
 import spotipy
-import gc
 import shutil
+import pytz
+from datetime import datetime
 from urllib.parse import quote
 from spotipy.oauth2 import SpotifyClientCredentials
 from threading import Thread
 from feedgen.feed import FeedGenerator
 from flask import Flask, send_from_directory
+from zotify_auth import ZotifyAuth
 
-DATA_DIR = "/data"
+DATA_DIR = "data"
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 
@@ -27,7 +29,9 @@ if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
 
 CONFIG_PATH = os.path.join(DATA_DIR, "config.json")
-CREDENTIAL_PATH = os.path.join(DATA_DIR, "credentials.json")
+ZOTIFY_CREDENTIAL_PATH = os.path.join(DATA_DIR, "zotify_credentials.json")
+
+EASTERN_TIMEZONE = pytz.timezone('US/Eastern')
 
 #Create Flask app
 app = Flask(__name__, static_folder=None)
@@ -36,38 +40,69 @@ app = Flask(__name__, static_folder=None)
 def update_rss_feed(podcast_id, podcast_data):
     podcast_dir = os.path.join(PODCASTS_DIR, podcast_id)
     podcast_name = podcast_data['name']
+    podcast_description = podcast_data['description']
+    podcast_cover_url = podcast_data['images'][0]['url']
     podcast_episodes = podcast_data['episodes']['items']
+
     # Set up the feed generator for this podcast
     fg_podcast = FeedGenerator()
+    fg_podcast.load_extension('podcast')
     fg_podcast.id(podcast_id)
     fg_podcast.title(podcast_name)
     fg_podcast.link(href=appurl + podcast_id + "/rss.xml", rel='alternate')
-    fg_podcast.description('Episodes for ' + podcast_name)
+    fg_podcast.description(podcast_description)
+    fg_podcast.image(url=podcast_cover_url)
 
-    #Add episodes
+    # Add episodes
     for episode in podcast_episodes:
         episode_id = episode['id']
         episode_name = episode['name']
+        episode_description = episode['description']
+        episode_published = episode['release_date']
+        episode_duration = episode['duration_ms']
         web_path = appurl + podcast_id + "/" + episode_id + ".ogg"
 
         fe = fg_podcast.add_entry()
         fe.id(episode_id)
         fe.title(episode_name)
         fe.link(href=web_path, rel='alternate')
-        fe.description('Episode for ' + podcast_name)
+        fe.description(episode_description)
+        episode_published = episode['release_date']
+        episode_published = datetime.fromisoformat(episode_published).replace(tzinfo=pytz.UTC).astimezone(EASTERN_TIMEZONE)
+        fe.pubDate(episode_published)
+        fe.enclosure(url=web_path, length=0, type='audio/ogg')
+        fe.podcast.itunes_duration(episode_duration // 1000)
 
     # Save the feed as an XML file in the subfolder
     fg_podcast.rss_file(os.path.join(podcast_dir, 'rss.xml'), pretty=True)
 
+
 # Set up the Flask app to serve the RSS feeds
 @app.route('/<path:filename>')
 def serve_file(filename):
+    if not filename:
+        return list_feeds()
     print("Serving:", filename)
     content_type, _ = mimetypes.guess_type(filename)
     if filename.endswith('.xml'):
         content_type = 'application/rss+xml'
     return send_from_directory(PODCASTS_DIR, filename, mimetype=content_type)
 
+
+@app.route('/')
+def list_feeds():
+    feeds = []
+    for podcast in podcasts:
+        podcast_id = podcast['id']
+        podcast_name = podcast['name']
+        rss_url = appurl + podcast_id + "/rss.xml"
+        feeds.append({'name': podcast_name, 'rss_url': rss_url})
+
+    html = "<h1>Available RSS Feeds:</h1><ul>"
+    for feed in feeds:
+        html += f"<li><a href='{feed['rss_url']}'>{feed['name']}</a></li>"
+    html += "</ul>"
+    return html
 
 #Load config
 def load_config(config_file):
@@ -91,6 +126,8 @@ def create_default_config(config_file):
         "appurl": "http://127.0.0.1/",
         "spotify_client_id": "your_client_ID",
         "spotify_client_secret": "your_client_secret",
+        "spotify_username": "your_username",
+        "spotify_password": "your_password",
         "podcasts": [
             {
                 "name": "Heavyweight",
@@ -124,7 +161,6 @@ def update_podcasts():
                     episode_id = episode['id']
                     episode_name = episode['name']
                     expected_path = os.path.join(os.path.join(PODCASTS_DIR, podcast_id), episode_id + ".ogg")
-                    print("Checking " + expected_path)
                     if not os.path.isfile(expected_path):
                         #Download missing episode
                         download_episode(podcast_id, podcast_name, episode)
@@ -144,7 +180,7 @@ def download_episode(podcast_id, podcast_name, episode):
         episode_id = episode['id']
         episode_name = episode['name']
         print("Downloading " + episode_url)
-        command = ["zotify", f"--credentials-location={CREDENTIAL_PATH}", f"--root-podcast-path={TEMP_DIR}", "--print-download-progress=False", "--download-format=ogg",episode_url]
+        command = ["zotify", f"--credentials-location={ZOTIFY_CREDENTIAL_PATH}", f"--root-podcast-path={TEMP_DIR}", "--print-download-progress=False", "--download-format=ogg",episode_url]
         subprocess.run(command, check=True)
         #Zotify doesnt respect formatting options for podcasts. So we downloaded the file to a temporary directory. We are now going to rename and move it.
         expected_dir = os.path.join(TEMP_DIR, podcast_name)
@@ -200,8 +236,14 @@ appurl = config['appurl']
 podcasts = config['podcasts']
 spotify_client_id = config['spotify_client_id']
 spotify_client_secret = config['spotify_client_secret']
+spotify_username = config['spotify_username']
+spotify_password = config['spotify_password']
 
-#Initiate Spotipy
+#Get and save token for Zotify auth
+if not os.path.isfile(ZOTIFY_CREDENTIAL_PATH):
+    ZotifyAuth.login(spotify_username, spotify_password, ZOTIFY_CREDENTIAL_PATH)
+
+#Initiate Spotipy library
 sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id=spotify_client_id, client_secret=spotify_client_secret))
 
 # Clear temp directory
