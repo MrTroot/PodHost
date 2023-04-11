@@ -25,13 +25,22 @@ def update_podcasts():
             podcast_id = podcast['id']
             podcast_localdata = get_local_metadata(podcast_id)
             podcast_data = sp.show(podcast_id, market='US')
+            podcast_name = podcast_data['name']
+
+            print(f'Updating {podcast_name}')
             
             #Compare our local episode data with the latest from the API. If the count is different, a new episode was released.
-            if(podcast_localdata == None or (len(podcast_localdata['episodes']['items']) != len(podcast_data['episodes']['items']))):
-                podcast_episodes = podcast_data['episodes']['items']
-                podcast_name = podcast_data['name']
+            if(podcast_localdata == None or (podcast_localdata['total_episodes'] != podcast_data['total_episodes'])):
                 
-                print(f'Updating {podcast_name}')
+                print(f'New episode(s) found for {podcast_name}')
+
+                #Get podcast episodes by iterating over all pages of results (API limit is 50)
+                results = sp.show_episodes(podcast_id, limit=50, market='US')
+                podcast_episodes = results['items']
+                while results['next']:
+                    results = sp.next(results)
+                    podcast_episodes.extend(results['items'])
+                
                 # Iterate through the episodes
                 for episode in podcast_episodes:
                     # Check if the episode has already been downloaded, download if not
