@@ -7,7 +7,6 @@ import json
 import spotipy
 import shutil
 import pytz
-import hashlib
 import config
 from flaskapp import start_flask_app
 from datetime import datetime
