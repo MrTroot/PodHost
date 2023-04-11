@@ -7,6 +7,7 @@ import json
 import spotipy
 import shutil
 import pytz
+import hashlib
 import config
 from flaskapp import start_flask_app
 from datetime import datetime
@@ -23,14 +24,14 @@ def update_podcasts():
             
             #Get podcast info from Spotify API
             podcast_id = podcast['id']
-            podcast_localdata = get_local_metadata(podcast_id)
-            podcast_data = sp.show(podcast_id, market='US')
-            podcast_name = podcast_data['name']
+            podcast_localmetadata = get_local_metadata(podcast_id)
+            podcast_info = sp.show(podcast_id, market='US')
+            podcast_name = podcast_info['name']
 
             print(f'Updating {podcast_name}')
             
             #Compare our local episode data with the latest from the API. If the count is different, a new episode was released.
-            if(podcast_localdata == None or (podcast_localdata['total_episodes'] != podcast_data['total_episodes'])):
+            if(podcast_localmetadata == None or (podcast_localmetadata['total_episodes'] != podcast_info['total_episodes'])):
                 
                 print(f'New episode(s) found for {podcast_name}')
 
@@ -52,21 +53,20 @@ def update_podcasts():
                         download_episode(podcast_id, podcast_name, episode)
                 
                 #After we have downloaded the latest episodes, update the RSS feed
-                update_rss_feed(podcast_id, podcast_data)
+                update_rss_feed(podcast_id, podcast_info, podcast_episodes)
 
             #Update local data
-            save_local_metadata(podcast_id, podcast_data)
+            save_local_metadata(podcast_id, podcast_info)
 
         time.sleep(7200)
 
 
 # Update the RSS feed for a given podcast
-def update_rss_feed(podcast_id, podcast_data):
+def update_rss_feed(podcast_id, podcast_info, podcast_episodes):
 
-    podcast_name = podcast_data['name']
-    podcast_description = podcast_data['description']
-    podcast_cover_url = podcast_data['images'][0]['url']
-    podcast_episodes = podcast_data['episodes']['items']
+    podcast_name = podcast_info['name']
+    podcast_description = podcast_info['description']
+    podcast_cover_url = podcast_info['images'][0]['url']
 
     # Set up the feed generator for this podcast
     fg_podcast = FeedGenerator()
@@ -165,6 +165,8 @@ def clear_temp_directory():
 #Get and save token for Zotify auth
 if not os.path.isfile(config.ZOTIFY_CREDENTIAL_PATH):
     ZotifyAuth.login(config.spotify_username, config.spotify_password, config.ZOTIFY_CREDENTIAL_PATH)
+
+
 
 #Initiate Spotipy library
 sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id=config.spotify_client_id, client_secret=config.spotify_client_secret))
