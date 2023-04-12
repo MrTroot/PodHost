@@ -30,29 +30,28 @@ def update_podcasts():
             print(f'Updating {podcast_name}')
             
             #Compare our local episode data with the latest from the API. If the count is different, a new episode was released.
-            if(podcast_localmetadata == None or (podcast_localmetadata['total_episodes'] != podcast_info['total_episodes'])):
-                
-                print(f'New episode(s) found for {podcast_name}')
+            #if(podcast_localmetadata == None or (podcast_localmetadata['total_episodes'] != podcast_info['total_episodes'])):
+                #print(f'New episode(s) found for {podcast_name}')
 
-                #Get podcast episodes by iterating over all pages of results (API limit is 50)
-                results = sp.show_episodes(podcast_id, limit=50, market='US')
-                podcast_episodes = results['items']
-                while results['next']:
-                    results = sp.next(results)
-                    podcast_episodes.extend(results['items'])
-                
-                # Iterate through the episodes
-                for episode in podcast_episodes:
-                    # Check if the episode has already been downloaded, download if not
-                    episode_id = episode['id']
-                    episode_name = episode['name']
-                    expected_path = os.path.join(os.path.join(config.PODCASTS_DIR, podcast_id), episode_id + ".ogg")
-                    if not os.path.isfile(expected_path):
-                        #Download missing episode
-                        download_episode(podcast_id, podcast_name, episode)
-                
-                #After we have downloaded the latest episodes, update the RSS feed
-                update_rss_feed(podcast_id, podcast_info, podcast_episodes)
+            #Get podcast episodes by iterating over all pages of results (API limit is 50)
+            results = sp.show_episodes(podcast_id, limit=50, market='US')
+            podcast_episodes = results['items']
+            while results['next']:
+                results = sp.next(results)
+                podcast_episodes.extend(results['items'])
+            
+            # Iterate through the episodes
+            for episode in podcast_episodes:
+                # Check if the episode has already been downloaded, download if not
+                episode_id = episode['id']
+                episode_name = episode['name']
+                expected_path = os.path.join(os.path.join(config.PODCASTS_DIR, podcast_id), episode_id + ".ogg")
+                if not os.path.isfile(expected_path):
+                    #Download missing episode
+                    download_episode(podcast_id, podcast_name, episode)
+            
+            #After we have downloaded the latest episodes, update the RSS feed
+            update_rss_feed(podcast_id, podcast_info, podcast_episodes)
 
             #Update local data
             save_local_metadata(podcast_id, podcast_info)
@@ -107,7 +106,7 @@ def download_episode(podcast_id, podcast_name, episode):
         episode_id = episode['id']
         episode_name = episode['name']
         print("Downloading " + episode_url)
-        command = ["zotify", f"--credentials-location={config.ZOTIFY_CREDENTIAL_PATH}", f"--root-podcast-path={config.TEMP_DIR}", "--print-download-progress=False", "--download-format=ogg",episode_url]
+        command = ["zotify", f"--credentials-location={config.ZOTIFY_CREDENTIAL_PATH}", f"--root-podcast-path={config.TEMP_DIR}", "--print-download-progress=False", "--print-errors=False", "--download-format=ogg",episode_url]
         subprocess.run(command, check=True)
         #Zotify doesnt respect formatting options for podcasts. So we downloaded the file to a temporary directory. We are now going to rename and move it.
         expected_dir = os.path.join(config.TEMP_DIR, podcast_name)
