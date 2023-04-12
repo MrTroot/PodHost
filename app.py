@@ -45,7 +45,7 @@ def update_podcasts():
                 # Check if the episode has already been downloaded, download if not
                 episode_id = episode['id']
                 episode_name = episode['name']
-                expected_path = os.path.join(os.path.join(config.PODCASTS_DIR, podcast_id), episode_id + ".ogg")
+                expected_path = os.path.join(get_podcast_dir(podcast_id), episode_id + ".ogg")
                 if not os.path.isfile(expected_path):
                     #Download missing episode
                     download_episode(podcast_id, podcast_name, episode)
@@ -131,7 +131,10 @@ def download_episode(podcast_id, podcast_name, episode):
 
 #Gets the directory for a given podcast
 def get_podcast_dir(podcast_id):
-    return os.path.join(config.PODCASTS_DIR, podcast_id)
+    podcast_dir = os.path.join(config.PODCASTS_DIR, podcast_id)
+    if not os.path.exists(podcast_dir):
+        os.makedirs(podcast_dir)
+    return podcast_dir
 
 
 def get_local_metadata(podcast_id):
