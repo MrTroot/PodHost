@@ -111,7 +111,7 @@ def download_episode(podcast_id, podcast_name, episode):
         print(command_result.stdout.decode())
         print(command_result.stderr.decode())
         #Zotify doesnt respect formatting options for podcasts. So we downloaded the file to a temporary directory. We are now going to rename and move it.
-        expected_dir = os.path.join(config.TEMP_DIR, podcast_name)
+        expected_dir = os.path.join(config.TEMP_DIR, fix_filename(podcast_name))
         expected_name = fix_filename(podcast_name) + ' - ' + fix_filename(episode_name)
         expected_file_path = os.path.join(expected_dir, expected_name + ".ogg")
 
