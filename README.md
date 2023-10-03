@@ -33,4 +33,4 @@ The `config.json` file contains the following fields:
 - `spotify_client_secret`: Your Spotify client secret.
 - `spotify_username`: Your Spotify username.
 - `spotify_password`: Your Spotify password.
-- `podcasts`: A list of podcast objects, each containing a `name` and `id`. The `id` should be the Spotify ID of the podcast. You can find this at the end of the URL for the podcast on the Spotify website.
+- `podcasts`: A list of podcasts, each containing a `name` and `id`. The `id` should be the Spotify ID of the podcast. You can find this at the end of the URL for the podcast on the Spotify website.
