@@ -28,7 +28,7 @@ Once the container is running, you can access the list of available RSS feeds at
 
 The `config.json` file contains the following fields:
 
-- `appurl`: The public URL where the application will be accessible. This will be used for the RSS audio file download URLs.
+- `appurl`: The public URL where the application will be accessible. This will also be used for the RSS audio file download URLs.
 - `spotify_client_id`: Your Spotify client ID. Get this by creating an app at https://developer.spotify.com/dashboard
 - `spotify_client_secret`: Your Spotify client secret.
 - `spotify_username`: Your Spotify username.
